@@ -1,0 +1,22 @@
+# Variables sensibles
+.env
+.env.*
+!.env.example
+
+# Archivos locales de desarrollo
+iniciar.ps1
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
