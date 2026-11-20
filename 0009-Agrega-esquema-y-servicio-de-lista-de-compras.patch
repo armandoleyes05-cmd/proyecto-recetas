@@ -1,0 +1,83 @@
+From 443fa801f5cd94e8e351102847694542468046e4 Mon Sep 17 00:00:00 2001
+From: Tu Nombre <tu-correo@ejemplo.com>
+Date: Fri, 20 Nov 2026 21:39:48 +0000
+Subject: [PATCH 09/10] Agrega esquema y servicio de lista de compras
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Compara los ingredientes de una receta con el inventario usando el catálogo para unificar nombres.
+---
+ app/schemas/lista_compras.py  | 19 +++++++++++++++++++
+ app/services/lista_compras.py | 33 +++++++++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
+ create mode 100644 app/schemas/lista_compras.py
+ create mode 100644 app/services/lista_compras.py
+
+diff --git a/app/schemas/lista_compras.py b/app/schemas/lista_compras.py
+new file mode 100644
+index 0000000..65e25c9
+--- /dev/null
++++ b/app/schemas/lista_compras.py
+@@ -0,0 +1,19 @@
++"""Esquema de la lista de compras de una receta.
++
++Compara los ingredientes de una receta con el inventario del usuario:
++
++1. `faltantes` son los ingredientes de la receta que el usuario no tiene.
++2. `disponibles` son los nombres que ya están en su inventario.
++Entre las dos listas aparecen todos los ingredientes de la receta, sin repetir ninguno.
++"""
++
++from pydantic import BaseModel
++
++from app.schemas.recipe import RecipeIngredient
++
++
++class ListaCompras(BaseModel):
++    receta_id: int
++    receta: str
++    faltantes: list[RecipeIngredient]
++    disponibles: list[str]
+diff --git a/app/services/lista_compras.py b/app/services/lista_compras.py
+new file mode 100644
+index 0000000..65c842a
+--- /dev/null
++++ b/app/services/lista_compras.py
+@@ -0,0 +1,33 @@
++"""Calcula qué ingredientes de una receta faltan en el inventario.
++
++Lógica pura. Para comparar nombres se usa el catálogo (`catalogo.buscar`), así
++"Tomates" de la receta coincide con "tomate" del inventario. Si un nombre no está
++en el catálogo se compara en minúsculas y con espacios simples.
++"""
++
++from collections.abc import Iterable
++
++from app.schemas.lista_compras import ListaCompras
++from app.schemas.recipe import RecipeOut
++from app.services import catalogo
++
++
++def _clave(nombre: str) -> str:
++    limpio = " ".join(nombre.split()).lower()
++    return catalogo.buscar(limpio) or limpio
++
++
++def calcular(receta: RecipeOut, inventario: Iterable[str]) -> ListaCompras:
++    tengo = {_clave(n) for n in inventario}
++    faltantes, disponibles = [], []
++    for ingrediente in receta.ingredientes:
++        if _clave(ingrediente.nombre) in tengo:
++            disponibles.append(ingrediente.nombre)
++        else:
++            faltantes.append(ingrediente)
++    return ListaCompras(
++        receta_id=receta.id,
++        receta=receta.nombre,
++        faltantes=faltantes,
++        disponibles=disponibles,
++    )
+-- 
+2.43.0
+
