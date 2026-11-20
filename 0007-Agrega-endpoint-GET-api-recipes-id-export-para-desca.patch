@@ -1,0 +1,80 @@
+From a544aadd4e92f6d28e9a72e05d5ae9907d42b44f Mon Sep 17 00:00:00 2001
+From: Tu Nombre <tu-correo@ejemplo.com>
+Date: Fri, 20 Nov 2026 21:39:23 +0000
+Subject: [PATCH 07/10] Agrega endpoint GET /api/recipes/{id}/export para
+ descargar recetas
+
+Devuelve .txt o .md como adjunto y respeta la propiedad de la receta.
+---
+ app/main.py           |  3 ++-
+ app/routers/export.py | 37 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+), 1 deletion(-)
+ create mode 100644 app/routers/export.py
+
+diff --git a/app/main.py b/app/main.py
+index cedd773..8260671 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
+ from fastapi.staticfiles import StaticFiles
+ 
+ from app.database import init_db
+-from app.routers import auth, estadisticas, ingredients, recipes, web
++from app.routers import auth, estadisticas, export, ingredients, recipes, web
+ 
+ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+ 
+@@ -36,6 +36,7 @@ app.include_router(auth.router)
+ app.include_router(ingredients.router)
+ app.include_router(recipes.router)
+ app.include_router(estadisticas.router)
++app.include_router(export.router)
+ app.include_router(web.router)
+ 
+ 
+diff --git a/app/routers/export.py b/app/routers/export.py
+new file mode 100644
+index 0000000..271ca71
+--- /dev/null
++++ b/app/routers/export.py
+@@ -0,0 +1,37 @@
++"""Descarga de una receta como archivo de texto o Markdown.
++
++`GET /api/recipes/{id}/export?formato=texto|markdown` devuelve el archivo con
++`Content-Disposition: attachment`. Reutiliza la verificación de propiedad del
++router de recetas: una receta ajena responde 404, igual que si no existiera.
++"""
++
++from fastapi import APIRouter, Depends, Query
++from fastapi.responses import Response
++from sqlalchemy.orm import Session
++
++from app.database import get_db
++from app.models import User
++from app.routers.recipes import _a_salida, _obtener
++from app.schemas.exportacion import FormatoExportacion
++from app.security import get_current_user
++from app.services import exportar
++
++router = APIRouter(prefix="/api/recipes", tags=["Recetas"])
++
++
++@router.get("/{receta_id}/export")
++def exportar_receta(
++    receta_id: int,
++    formato: FormatoExportacion = Query(FormatoExportacion.TEXTO),
++    user: User = Depends(get_current_user),
++    db: Session = Depends(get_db),
++):
++    """Descarga la receta como `.txt` o `.md`."""
++    receta = _a_salida(_obtener(db, receta_id, user))
++    return Response(
++        content=exportar.exportar(receta, formato),
++        media_type=formato.media_type,
++        headers={
++            "Content-Disposition": f'attachment; filename="{exportar.nombre_archivo(receta, formato)}"'
++        },
++    )
+-- 
+2.43.0
+
