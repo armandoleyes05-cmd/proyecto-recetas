@@ -1,0 +1,68 @@
+From 1cf4ba3d016ca3e764f5147fcb108bbf0bcd3332 Mon Sep 17 00:00:00 2001
+From: Tu Nombre <tu-correo@ejemplo.com>
+Date: Fri, 20 Nov 2026 21:39:48 +0000
+Subject: [PATCH 08/10] =?UTF-8?q?Agrega=20pruebas=20de=20exportaci=C3=B3n:?=
+ =?UTF-8?q?=20nombre=20seguro,=20formatos=20y=20endpoint?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Verifica el nombre de archivo, el contenido, el 422 por formato inválido y el 404 por receta inexistente.
+---
+ tests/test_exportar.py | 44 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 tests/test_exportar.py
+
+diff --git a/tests/test_exportar.py b/tests/test_exportar.py
+new file mode 100644
+index 0000000..a507c9d
+--- /dev/null
++++ b/tests/test_exportar.py
+@@ -0,0 +1,44 @@
++"""Pruebas de exportación de recetas."""
++
++from app.schemas.exportacion import FormatoExportacion
++from app.schemas.recipe import RecipeOut
++from app.services import exportar
++
++
++def _receta(nombre="Arroz con Pollo Ñam"):
++    return RecipeOut(
++        id=1,
++        nombre=nombre,
++        ingredientes=[{"nombre": "arroz", "cantidad": "2 tazas"}],
++        pasos=["Lavar el arroz", "Cocinar 20 minutos"],
++        tiempo_minutos=30,
++        dificultad="facil",
++        inventario_usado=["arroz"],
++        modelo_llm="mock",
++        creado_en="2026-11-20T10:00:00",
++    )
++
++
++def test_nombre_de_archivo_seguro():
++    nombre = exportar.nombre_archivo(_receta(), FormatoExportacion.MARKDOWN)
++    assert nombre == "arroz-con-pollo-nam.md"
++    raro = exportar.nombre_archivo(_receta('"; rm -rf /'), FormatoExportacion.TEXTO)
++    assert raro == "rm-rf.txt"
++
++
++def test_markdown_y_texto_incluyen_pasos_numerados():
++    md = exportar.exportar(_receta(), FormatoExportacion.MARKDOWN)
++    assert md.startswith("# Arroz con Pollo Ñam") and "1. Lavar el arroz" in md
++    txt = exportar.exportar(_receta(), FormatoExportacion.TEXTO)
++    assert "INGREDIENTES" in txt and "2. Cocinar 20 minutos" in txt
++
++
++def test_endpoint_descarga_adjunto(auth_client):
++    auth_client.post("/api/ingredients", json={"nombre": "tomate"})
++    rid = auth_client.post("/api/recipes/generate", json={}).json()["id"]
++    resp = auth_client.get(f"/api/recipes/{rid}/export?formato=markdown")
++    assert resp.status_code == 200
++    assert "attachment" in resp.headers["content-disposition"]
++    assert resp.text.startswith("# ")
++    assert auth_client.get(f"/api/recipes/{rid}/export?formato=pdf").status_code == 422
++    assert auth_client.get("/api/recipes/9999/export").status_code == 404
+-- 
+2.43.0
+
