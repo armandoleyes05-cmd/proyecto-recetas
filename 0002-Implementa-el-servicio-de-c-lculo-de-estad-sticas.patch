@@ -1,0 +1,62 @@
+From 5541539e3c7c191f0b9052ea69f3c29772bfdb76 Mon Sep 17 00:00:00 2001
+From: Tu Nombre <tu-correo@ejemplo.com>
+Date: Fri, 20 Nov 2026 21:38:35 +0000
+Subject: [PATCH 02/10] =?UTF-8?q?Implementa=20el=20servicio=20de=20c=C3=A1?=
+ =?UTF-8?q?lculo=20de=20estad=C3=ADsticas?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Lógica pura sin base de datos: fácil de probar y de reutilizar.
+---
+ app/services/estadisticas.py | 38 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+ create mode 100644 app/services/estadisticas.py
+
+diff --git a/app/services/estadisticas.py b/app/services/estadisticas.py
+new file mode 100644
+index 0000000..0633646
+--- /dev/null
++++ b/app/services/estadisticas.py
+@@ -0,0 +1,38 @@
++"""Cálculo de estadísticas a partir de las recetas de un usuario.
++
++Es lógica pura: recibe una lista de recetas (objetos con los mismos atributos que
++el modelo `Recipe`) y devuelve un `EstadisticasOut`. No toca la base de datos ni
++FastAPI, así se puede probar con objetos simples y reutilizar en otros lugares.
++
++Reglas:
++
++1. Sin recetas, todos los contadores son 0 y los promedios son `None`.
++2. El promedio de estrellas ignora las recetas sin calificación.
++3. El ingrediente más usado se decide por número de recetas en que aparece; en un
++   empate gana el primero en orden alfabético, para que el resultado sea estable.
++"""
++
++from collections import Counter
++from collections.abc import Iterable
++
++from app.schemas.estadisticas import EstadisticasOut
++
++
++def calcular(recetas: Iterable) -> EstadisticasOut:
++    recetas = list(recetas)
++    estrellas = [r.calificacion.estrellas for r in recetas if r.calificacion is not None]
++    tiempos = [r.tiempo_minutos for r in recetas]
++
++    uso = Counter(nombre for r in recetas for nombre in set(r.inventario_usado))
++    mas_usado = None
++    if uso:
++        mas_usado = sorted(uso.items(), key=lambda par: (-par[1], par[0]))[0][0]
++
++    return EstadisticasOut(
++        total_recetas=len(recetas),
++        calificadas=len(estrellas),
++        promedio_estrellas=round(sum(estrellas) / len(estrellas), 2) if estrellas else None,
++        tiempo_promedio_minutos=round(sum(tiempos) / len(tiempos), 1) if tiempos else None,
++        por_dificultad=dict(Counter(r.dificultad for r in recetas)),
++        ingrediente_mas_usado=mas_usado,
++    )
+-- 
+2.43.0
+
