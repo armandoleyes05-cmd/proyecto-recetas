@@ -1,0 +1,71 @@
+From 86a03d502681f8bc5e9599477e5b9c54a286d273 Mon Sep 17 00:00:00 2001
+From: Tu Nombre <tu-correo@ejemplo.com>
+Date: Fri, 20 Nov 2026 21:39:17 +0000
+Subject: [PATCH 04/10] =?UTF-8?q?Agrega=20pruebas=20del=20servicio=20y=20d?=
+ =?UTF-8?q?el=20endpoint=20de=20estad=C3=ADsticas?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Cubre el caso vacío, el promedio sin calificaciones, el desempate y la protección con JWT.
+---
+ tests/test_estadisticas.py | 47 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+ create mode 100644 tests/test_estadisticas.py
+
+diff --git a/tests/test_estadisticas.py b/tests/test_estadisticas.py
+new file mode 100644
+index 0000000..63b989f
+--- /dev/null
++++ b/tests/test_estadisticas.py
+@@ -0,0 +1,47 @@
++"""Pruebas del servicio y del endpoint de estadísticas."""
++
++from types import SimpleNamespace as NS
++
++from app.services import estadisticas
++
++
++def _receta(dificultad="fácil", minutos=30, estrellas=None, inventario=("tomate",)):
++    return NS(
++        dificultad=dificultad,
++        tiempo_minutos=minutos,
++        calificacion=NS(estrellas=estrellas) if estrellas else None,
++        inventario_usado=list(inventario),
++    )
++
++
++def test_sin_recetas_devuelve_ceros_y_none():
++    r = estadisticas.calcular([])
++    assert r.total_recetas == 0 and r.calificadas == 0
++    assert r.promedio_estrellas is None and r.ingrediente_mas_usado is None
++
++
++def test_promedio_ignora_recetas_sin_calificacion():
++    r = estadisticas.calcular([_receta(estrellas=5), _receta(estrellas=3), _receta()])
++    assert (r.total_recetas, r.calificadas, r.promedio_estrellas) == (3, 2, 4.0)
++
++
++def test_ingrediente_mas_usado_y_desempate_alfabetico():
++    r = estadisticas.calcular(
++        [_receta(inventario=("cebolla", "tomate")), _receta(inventario=("tomate", "arroz"))]
++    )
++    assert r.ingrediente_mas_usado == "tomate"
++    empate = estadisticas.calcular([_receta(inventario=("pollo",)), _receta(inventario=("arroz",))])
++    assert empate.ingrediente_mas_usado == "arroz"
++
++
++def test_endpoint_sin_token_devuelve_401(client):
++    assert client.get("/api/estadisticas").status_code == 401
++
++
++def test_endpoint_resume_las_recetas_del_usuario(auth_client):
++    auth_client.post("/api/ingredients", json={"nombre": "tomate"})
++    receta_id = auth_client.post("/api/recipes/generate", json={}).json()["id"]
++    auth_client.put(f"/api/recipes/{receta_id}/rating", json={"estrellas": 4})
++    datos = auth_client.get("/api/estadisticas").json()
++    assert datos["total_recetas"] == 1 and datos["promedio_estrellas"] == 4.0
++    assert datos["ingrediente_mas_usado"] == "tomate"
+-- 
+2.43.0
+
