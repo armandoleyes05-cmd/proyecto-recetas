@@ -1,0 +1,47 @@
+From ffc68c2e8ff69888e51f7e3b02b57cc294191196 Mon Sep 17 00:00:00 2001
+From: Tu Nombre <tu-correo@ejemplo.com>
+Date: Fri, 20 Nov 2026 21:39:17 +0000
+Subject: [PATCH 05/10] =?UTF-8?q?Agrega=20esquema=20con=20los=20formatos?=
+ =?UTF-8?q?=20de=20exportaci=C3=B3n=20de=20recetas?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Enum con tipo MIME y extensión; valida el parámetro formato.
+---
+ app/schemas/exportacion.py | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 app/schemas/exportacion.py
+
+diff --git a/app/schemas/exportacion.py b/app/schemas/exportacion.py
+new file mode 100644
+index 0000000..6acc1c7
+--- /dev/null
++++ b/app/schemas/exportacion.py
+@@ -0,0 +1,23 @@
++"""Formatos en que se puede exportar una receta.
++
++`FormatoExportacion` limita el parámetro `formato` a valores conocidos: cualquier
++otro valor se rechaza con 422 antes de llegar al servicio. Cada formato lleva su
++tipo MIME y su extensión de archivo.
++"""
++
++from enum import Enum
++
++
++class FormatoExportacion(str, Enum):
++    TEXTO = "texto"
++    MARKDOWN = "markdown"
++
++    @property
++    def media_type(self) -> str:
++        return "text/markdown; charset=utf-8" if self is FormatoExportacion.MARKDOWN else (
++            "text/plain; charset=utf-8"
++        )
++
++    @property
++    def extension(self) -> str:
++        return "md" if self is FormatoExportacion.MARKDOWN else "txt"
+-- 
+2.43.0
+
