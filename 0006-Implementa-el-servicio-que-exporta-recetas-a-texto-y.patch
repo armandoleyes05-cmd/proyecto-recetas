@@ -1,0 +1,78 @@
+From deec7a381c5ad8e762ddd89fcd8ce76fdcf5d00b Mon Sep 17 00:00:00 2001
+From: Tu Nombre <tu-correo@ejemplo.com>
+Date: Fri, 20 Nov 2026 21:39:17 +0000
+Subject: [PATCH 06/10] Implementa el servicio que exporta recetas a texto y
+ Markdown
+
+Incluye un generador de nombre de archivo seguro para el header de descarga.
+---
+ app/services/exportar.py | 57 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 app/services/exportar.py
+
+diff --git a/app/services/exportar.py b/app/services/exportar.py
+new file mode 100644
+index 0000000..fb015b6
+--- /dev/null
++++ b/app/services/exportar.py
+@@ -0,0 +1,57 @@
++"""Convierte una receta en texto descargable.
++
++Funciones puras (sin base de datos ni FastAPI):
++
++1. `a_texto` y `a_markdown` reciben un `RecipeOut` y devuelven el contenido.
++2. `nombre_archivo` genera un nombre seguro para el header Content-Disposition:
++   sin tildes, en minúsculas y solo con letras, números y guiones. Así el nombre
++   de una receta (que viene del LLM) no puede inyectar caracteres raros en el header.
++"""
++
++import re
++import unicodedata
++
++from app.schemas.exportacion import FormatoExportacion
++from app.schemas.recipe import RecipeOut
++
++
++def nombre_archivo(receta: RecipeOut, formato: FormatoExportacion) -> str:
++    base = unicodedata.normalize("NFD", receta.nombre)
++    base = "".join(c for c in base if unicodedata.category(c) != "Mn")
++    base = re.sub(r"[^a-z0-9]+", "-", base.lower()).strip("-") or "receta"
++    return f"{base[:60]}.{formato.extension}"
++
++
++def a_texto(receta: RecipeOut) -> str:
++    lineas = [
++        receta.nombre.upper(),
++        f"Tiempo: {receta.tiempo_minutos} min | Dificultad: {receta.dificultad.value}",
++        "",
++        "INGREDIENTES",
++        *[f"- {i.cantidad} de {i.nombre}" for i in receta.ingredientes],
++        "",
++        "PASOS",
++        *[f"{n}. {paso}" for n, paso in enumerate(receta.pasos, start=1)],
++    ]
++    return "\n".join(lineas) + "\n"
++
++
++def a_markdown(receta: RecipeOut) -> str:
++    lineas = [
++        f"# {receta.nombre}",
++        "",
++        f"**Tiempo:** {receta.tiempo_minutos} min · **Dificultad:** {receta.dificultad.value}",
++        "",
++        "## Ingredientes",
++        "",
++        *[f"- {i.cantidad} de {i.nombre}" for i in receta.ingredientes],
++        "",
++        "## Pasos",
++        "",
++        *[f"{n}. {paso}" for n, paso in enumerate(receta.pasos, start=1)],
++    ]
++    return "\n".join(lineas) + "\n"
++
++
++def exportar(receta: RecipeOut, formato: FormatoExportacion) -> str:
++    return a_markdown(receta) if formato is FormatoExportacion.MARKDOWN else a_texto(receta)
+-- 
+2.43.0
+
